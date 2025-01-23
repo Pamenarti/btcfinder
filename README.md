@@ -1,7 +1,11 @@
 # Bitcoin Wallet Hunter
 
 A highly efficient Bitcoin wallet generator and matcher that leverages parallel processing and sophisticated optimization strategies. This tool is designed to maximize performance by utilizing multiple CPU cores for concurrent wallet generation, ensuring rapid processing times. It incorporates advanced algorithms and data structures to enhance the matching process, allowing for quick identification of wallet addresses. The system is built with scalability in mind, capable of handling large datasets through optimized memory management techniques and asynchronous operations, making it suitable for both individual users and large-scale applications.
+
+
 ![alt text](image.png)
+
+
 ## 🚀 Features
 
 - **Multi-Processing Architecture**
