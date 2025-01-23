@@ -3,30 +3,31 @@ import time
 import queue
 import signal
 import numpy as np
+import cupy as cp
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from typing import List, Tuple, Set
 from config import DEFAULT_THREAD_COUNT, BATCH_SIZE
-from wallet_generator import WalletGenerator
+from wallet_generator_gpu import WalletGeneratorGPU
 from file_handler import FileHandler
 
 class AddressMatcher:
     def __init__(self, thread_count: int, target_count: int):
         self.file_handler = FileHandler()
-        self.wallet_generator = WalletGenerator()
+        self.wallet_generator = WalletGeneratorGPU()  # GPU destekli generator
         self.thread_count = thread_count
         self.target_count = target_count
         self.total_attempts = 0
         self.start_time = None
         self.is_running = True
-        self.max_futures = thread_count * 8
-        self.result_queue = queue.Queue(maxsize=5000)
-        self.progress_interval = max(5000, BATCH_SIZE)
-        self.batch_multiplier = 2
+        self.max_futures = thread_count * 4  # GPU için daha az thread yeterli
+        self.result_queue = queue.Queue(maxsize=10000)  # Kuyruk boyutunu artırdık
+        self.progress_interval = max(10000, BATCH_SIZE)  # İlerleme gösterimi aralığını artırdık
+        self.batch_multiplier = 4  # GPU için batch boyutunu artırdık
         self.shutdown_event = False
         
-        # Rich adresler için numpy array kullanarak hızlı arama
-        self.rich_addresses_array = np.array(list(self.file_handler.rich_addresses))
-        self.rich_addresses_set = self.file_handler.rich_addresses
+        # Rich adresler için GPU belleğinde array
+        self.rich_addresses_cpu = np.array(list(self.file_handler.rich_addresses))
+        self.rich_addresses_gpu = cp.array(self.rich_addresses_cpu)
 
         # Ctrl+C sinyalini yakala
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -45,10 +46,10 @@ class AddressMatcher:
     def optimize_batch_size(self, elapsed_time: float, current_speed: float):
         """Performansa göre batch boyutunu optimize eder"""
         if elapsed_time > 10:
-            if current_speed < 10000:
-                self.batch_multiplier = min(4, self.batch_multiplier * 1.5)
-            elif current_speed > 50000:
-                self.batch_multiplier = max(1, self.batch_multiplier * 0.8)
+            if current_speed < 50000:  # GPU için eşik değerleri artırdık
+                self.batch_multiplier = min(8, self.batch_multiplier * 1.5)
+            elif current_speed > 200000:
+                self.batch_multiplier = max(2, self.batch_multiplier * 0.8)
 
     def check_wallet_batch(self) -> List[Tuple[str, str]]:
         """Bir batch cüzdan üretir ve zengin adreslerle eşleşenleri bulur"""
@@ -65,17 +66,17 @@ class AddressMatcher:
         wallets = self.wallet_generator.generate_wallet_batch(batch_size)
         found_wallets = []
         
-        # Numpy ile hızlı adres kontrolü
-        addresses = np.array([w[0] for w in wallets])
-        mask = np.isin(addresses, self.rich_addresses_array)
+        # GPU ile hızlı adres kontrolü
+        addresses = cp.array([w[0] for w in wallets])
+        mask = cp.isin(addresses, self.rich_addresses_gpu)
         if mask.any():
-            found_indices = np.where(mask)[0]
-            found_wallets.extend(wallets[i] for i in found_indices)
+            found_indices = cp.where(mask)[0]
+            found_wallets.extend(wallets[i] for i in found_indices.get())
         
-        # Sonuçları kuyruğa ekle (her 10 cüzdandan birini göster)
+        # Sonuçları kuyruğa ekle (her 20 cüzdandan birini göster)
         if not self.shutdown_event:
             for i, wallet in enumerate(wallets):
-                if i % 10 == 0:
+                if i % 20 == 0:  # GPU için gösterim aralığını artırdık
                     try:
                         self.result_queue.put_nowait(wallet)
                     except queue.Full:
@@ -97,9 +98,11 @@ class AddressMatcher:
             self.optimize_batch_size(elapsed_time, speed)
             
             # İlerleme göster
-            print("\rÜretilen: {:,}/{:,} | Hız: {:,.0f} c/s | Batch: {:,}".format(
+            print("\rÜretilen: {:,}/{:,} | Hız: {:,.0f} c/s | Batch: {:,} | GPU Bellek: {:.1f}GB".format(
                 self.total_attempts, self.target_count, speed, 
-                int(BATCH_SIZE * self.batch_multiplier)), end="", flush=True)
+                int(BATCH_SIZE * self.batch_multiplier),
+                cp.get_default_memory_pool().used_bytes() / 1e9
+            ), end="", flush=True)
 
     def result_printer(self):
         """Ayrı bir thread'de sonuçları yazdırır"""
@@ -133,11 +136,13 @@ class AddressMatcher:
         print("Ortalama Hız: {:,.2f} cüzdan/saniye".format(attempts_per_second))
         print("Son Batch Boyutu: {:,}".format(int(BATCH_SIZE * self.batch_multiplier)))
         print("Kullanılan Thread Sayısı: {}".format(self.thread_count))
+        print("GPU Bellek Kullanımı: {:.1f}GB".format(
+            cp.get_default_memory_pool().used_bytes() / 1e9))
         print("="*80)
 
     def start_matching(self):
         """Çoklu thread ile cüzdan üretme ve eşleştirme işlemini başlatır"""
-        logging.info("Eşleştirme işlemi başlatılıyor... ({} thread ile {} cüzdan üretilecek)".format(
+        logging.info("GPU destekli eşleştirme işlemi başlatılıyor... ({} thread ile {} cüzdan üretilecek)".format(
             self.thread_count, self.target_count))
         self.start_time = time.time()
         
@@ -190,6 +195,13 @@ class AddressMatcher:
             self.is_running = False
         
         finally:
+            # GPU belleğini temizle
+            try:
+                self.rich_addresses_gpu = None
+                cp.get_default_memory_pool().free_all_blocks()
+            except:
+                pass
+                
             if not self.shutdown_event:
                 print("\nİşlem tamamlandı!")
             self.display_stats() 
