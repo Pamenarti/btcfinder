@@ -5,11 +5,11 @@ from config import LOG_FILE, LOG_FORMAT, LOG_LEVEL, MAX_CPU, DEFAULT_THREAD_COUN
 from address_matcher import AddressMatcher
 
 def setup_logging():
-    """Logging ayarlarını yapılandırır"""
+    """Configure logging settings"""
     root_logger = logging.getLogger()
     root_logger.setLevel(LOG_LEVEL)
 
-    # Dosyaya logla
+    # Log to file
     file_handler = ConcurrentRotatingFileHandler(
         LOG_FILE,
         maxBytes=1024 * 1024,  # 1MB
@@ -18,18 +18,18 @@ def setup_logging():
     file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
     root_logger.addHandler(file_handler)
 
-    # Konsola logla
+    # Log to console
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
     root_logger.addHandler(console_handler)
 
 def get_thread_count() -> int:
-    """Kullanıcıdan thread sayısını alır"""
+    """Get number of threads from user"""
     while True:
-        print("\nSistemde {} CPU çekirdeği bulundu.".format(MAX_CPU))
-        print("Önerilen thread sayısı: {}".format(DEFAULT_THREAD_COUNT))
+        print("\nDetected {} CPU cores.".format(MAX_CPU))
+        print("Recommended thread count: {}".format(DEFAULT_THREAD_COUNT))
         try:
-            thread_count = input("Kullanılacak thread sayısını girin [Enter=Önerilen]: ").strip()
+            thread_count = input("Enter number of threads to use [Enter=Recommended]: ").strip()
             if not thread_count:
                 return DEFAULT_THREAD_COUNT
                 
@@ -37,43 +37,43 @@ def get_thread_count() -> int:
             if 1 <= thread_count <= MAX_CPU:
                 return thread_count
             else:
-                print("Thread sayısı 1 ile {} arasında olmalıdır.".format(MAX_CPU))
+                print("Thread count must be between 1 and {}.".format(MAX_CPU))
         except ValueError:
-            print("Geçersiz değer. Lütfen bir sayı girin.")
+            print("Invalid value. Please enter a number.")
 
 def get_target_count() -> int:
-    """Kullanıcıdan üretilecek cüzdan sayısını alır"""
+    """Get number of wallets to generate from user"""
     while True:
         try:
-            count = input("\nKaç adet cüzdan üretilsin? ").strip()
+            count = input("\nHow many wallets to generate? ").strip()
             count = int(count)
             if count > 0:
                 return count
             else:
-                print("Cüzdan sayısı 0'dan büyük olmalıdır.")
+                print("Wallet count must be greater than 0.")
         except ValueError:
-            print("Geçersiz değer. Lütfen bir sayı girin.")
+            print("Invalid value. Please enter a number.")
 
 def get_log_preference() -> bool:
-    """Kullanıcıdan log tercihini alır"""
+    """Get wallet logging preference from user"""
     while True:
-        choice = input("\nÜretilen tüm cüzdanlar kaydedilsin mi? (e/h) [h]: ").strip().lower()
-        if choice in ['', 'h', 'n', 'hayır', 'no']:
+        choice = input("\nLog all generated wallets? (y/n) [n]: ").strip().lower()
+        if choice in ['', 'n', 'no']:
             return False
-        elif choice in ['e', 'y', 'evet', 'yes']:
-            print("DİKKAT: Bu seçenek disk kullanımını artıracak ve performansı etkileyebilecektir.")
-            confirm = input("Devam etmek istiyor musunuz? (e/h) [h]: ").strip().lower()
-            if confirm in ['e', 'y', 'evet', 'yes']:
+        elif choice in ['y', 'yes']:
+            print("WARNING: This option will increase disk usage and may affect performance.")
+            confirm = input("Do you want to continue? (y/n) [n]: ").strip().lower()
+            if confirm in ['y', 'yes']:
                 return True
             else:
                 return False
-        print("Geçersiz seçim. 'e' veya 'h' girin.")
+        print("Invalid choice. Enter 'y' or 'n'.")
 
 def main():
-    """Ana program"""
+    """Main program"""
     try:
         setup_logging()
-        logging.info("Program başlatılıyor...")
+        logging.info("Starting program...")
         
         thread_count = get_thread_count()
         target_count = get_target_count()
@@ -83,9 +83,9 @@ def main():
         matcher.start_matching()
         
     except KeyboardInterrupt:
-        logging.info("Program kullanıcı tarafından durduruldu")
+        logging.info("Program stopped by user")
     except Exception as e:
-        logging.error("Beklenmeyen hata: {}".format(str(e)), exc_info=True)
+        logging.error("Unexpected error: {}".format(str(e)), exc_info=True)
         sys.exit(1)
 
 if __name__ == "__main__":
