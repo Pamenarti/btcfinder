@@ -5,12 +5,12 @@ import signal
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 from typing import List, Tuple, Set
-from config import DEFAULT_THREAD_COUNT, BATCH_SIZE
+from config import DEFAULT_THREAD_COUNT, BATCH_SIZE, WALLET_LOG_FILE
 from wallet_generator import WalletGenerator
 from file_handler import FileHandler
 
 class AddressMatcher:
-    def __init__(self, thread_count: int, target_count: int):
+    def __init__(self, thread_count: int, target_count: int, log_wallets: bool = False):
         self.file_handler = FileHandler()
         self.wallet_generator = WalletGenerator()
         self.thread_count = thread_count
@@ -23,6 +23,9 @@ class AddressMatcher:
         self.progress_interval = max(5000, BATCH_SIZE)
         self.batch_multiplier = 2
         self.shutdown_event = False
+        self.log_wallets = log_wallets
+        self.wallet_log_buffer = []
+        self.wallet_log_buffer_size = 1000  # Her 1000 cüzdanda bir dosyaya yaz
         
         # Rich adresler için numpy array kullanarak hızlı arama
         self.rich_addresses_array = np.array(list(self.file_handler.rich_addresses))
@@ -50,6 +53,22 @@ class AddressMatcher:
             elif current_speed > 50000:
                 self.batch_multiplier = max(1, self.batch_multiplier * 0.8)
 
+    def _log_wallets_to_file(self, wallets: List[Tuple[str, str]], force: bool = False):
+        """Cüzdanları log dosyasına yazar"""
+        if not self.log_wallets:
+            return
+            
+        self.wallet_log_buffer.extend(wallets)
+        
+        if len(self.wallet_log_buffer) >= self.wallet_log_buffer_size or force:
+            try:
+                with open(WALLET_LOG_FILE, 'a') as f:
+                    for address, private_key in self.wallet_log_buffer:
+                        f.write("{}:{}\n".format(address, private_key))
+                self.wallet_log_buffer.clear()
+            except Exception as e:
+                logging.error("Cüzdan log dosyası yazılırken hata: {}".format(str(e)))
+
     def check_wallet_batch(self) -> List[Tuple[str, str]]:
         """Bir batch cüzdan üretir ve zengin adreslerle eşleşenleri bulur"""
         if not self.is_running or self.shutdown_event:
@@ -71,6 +90,10 @@ class AddressMatcher:
         if mask.any():
             found_indices = np.where(mask)[0]
             found_wallets.extend(wallets[i] for i in found_indices)
+        
+        # Cüzdanları logla
+        if self.log_wallets:
+            self._log_wallets_to_file(wallets)
         
         # Sonuçları kuyruğa ekle (her 10 cüzdandan birini göster)
         if not self.shutdown_event:
@@ -97,9 +120,14 @@ class AddressMatcher:
             self.optimize_batch_size(elapsed_time, speed)
             
             # İlerleme göster
-            print("\rÜretilen: {:,}/{:,} | Hız: {:,.0f} c/s | Batch: {:,}".format(
+            status = "\rÜretilen: {:,}/{:,} | Hız: {:,.0f} c/s | Batch: {:,}".format(
                 self.total_attempts, self.target_count, speed, 
-                int(BATCH_SIZE * self.batch_multiplier)), end="", flush=True)
+                int(BATCH_SIZE * self.batch_multiplier))
+            
+            if self.log_wallets:
+                status += " | Log: Aktif"
+                
+            print(status, end="", flush=True)
 
     def result_printer(self):
         """Ayrı bir thread'de sonuçları yazdırır"""
@@ -137,8 +165,8 @@ class AddressMatcher:
 
     def start_matching(self):
         """Çoklu thread ile cüzdan üretme ve eşleştirme işlemini başlatır"""
-        logging.info("Eşleştirme işlemi başlatılıyor... ({} thread ile {} cüzdan üretilecek)".format(
-            self.thread_count, self.target_count))
+        logging.info("Eşleştirme işlemi başlatılıyor... ({} thread ile {} cüzdan üretilecek{})".format(
+            self.thread_count, self.target_count, ", cüzdan logları aktif" if self.log_wallets else ""))
         self.start_time = time.time()
         
         try:
@@ -170,6 +198,10 @@ class AddressMatcher:
                 for future in futures:
                     future.cancel()
                 
+                # Kalan logları yaz
+                if self.log_wallets:
+                    self._log_wallets_to_file([], force=True)
+                
                 try:
                     printer_future.result(timeout=0.5)
                 except:
@@ -183,6 +215,10 @@ class AddressMatcher:
             # Tüm işleri iptal et
             for future in futures:
                 future.cancel()
+            
+            # Kalan logları yaz
+            if self.log_wallets:
+                self._log_wallets_to_file([], force=True)
         
         except Exception as e:
             logging.error("Beklenmeyen hata: {}".format(str(e)))

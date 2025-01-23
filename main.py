@@ -54,6 +54,21 @@ def get_target_count() -> int:
         except ValueError:
             print("Geçersiz değer. Lütfen bir sayı girin.")
 
+def get_log_preference() -> bool:
+    """Kullanıcıdan log tercihini alır"""
+    while True:
+        choice = input("\nÜretilen tüm cüzdanlar kaydedilsin mi? (e/h) [h]: ").strip().lower()
+        if choice in ['', 'h', 'n', 'hayır', 'no']:
+            return False
+        elif choice in ['e', 'y', 'evet', 'yes']:
+            print("DİKKAT: Bu seçenek disk kullanımını artıracak ve performansı etkileyebilecektir.")
+            confirm = input("Devam etmek istiyor musunuz? (e/h) [h]: ").strip().lower()
+            if confirm in ['e', 'y', 'evet', 'yes']:
+                return True
+            else:
+                return False
+        print("Geçersiz seçim. 'e' veya 'h' girin.")
+
 def main():
     """Ana program"""
     try:
@@ -62,8 +77,9 @@ def main():
         
         thread_count = get_thread_count()
         target_count = get_target_count()
+        log_wallets = get_log_preference()
         
-        matcher = AddressMatcher(thread_count, target_count)
+        matcher = AddressMatcher(thread_count, target_count, log_wallets)
         matcher.start_matching()
         
     except KeyboardInterrupt:

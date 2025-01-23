@@ -11,6 +11,7 @@ if hasattr(PROCESS, 'nice'):
 BASE_DIR = Path(__file__).resolve().parent
 RICH_ADDRESSES_FILE = os.path.join(BASE_DIR, "rich.txt")
 FOUND_ADDRESSES_FILE = os.path.join(BASE_DIR, "found.txt")
+WALLET_LOG_FILE = os.path.join(BASE_DIR, "wallets.log")  # Yeni üretilen cüzdanlar için log dosyası
 
 # CPU ayarları
 MAX_CPU = os.cpu_count()
