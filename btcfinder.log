@@ -99,3 +99,6 @@ concurrent.futures._base.TimeoutError: 2 (of 2) futures unfinished
 2025-01-23 19:19:13,496 - INFO - Program baþlatýlýyor...
 2025-01-23 19:19:24,053 - INFO - 186518 adet zengin adres yüklendi
 2025-01-23 19:19:24,133 - INFO - Eþleþtirme iþlemi baþlatýlýyor... (1 thread ile 50000 cüzdan üretilecek, cüzdan loglarý aktif)
+2025-01-23 19:27:47,363 - INFO - Starting program...
+2025-01-23 19:27:56,316 - INFO - 186518 rich addresses loaded
+2025-01-23 19:27:56,436 - INFO - Starting matching process... (2 threads, 123123 wallets)
