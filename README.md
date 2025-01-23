@@ -8,22 +8,37 @@ A highly efficient Bitcoin wallet generator and matcher that leverages parallel 
   - Utilizes Python's multiprocessing for parallel wallet generation
   - Optimized thread management based on CPU cores
   - Process pool implementation for batch operations
+  - Dynamic batch size optimization based on performance metrics
+  - Automatic thread count suggestion based on system capabilities
 
 - **Advanced Memory Management**
   - Memory-mapped file operations for large datasets
   - Efficient memory allocation with deque data structures
   - Optimized buffer sizes for I/O operations
+  - Memory usage monitoring and automatic optimization
+  - Buffer-based wallet logging system
 
 - **Performance Optimizations**
   - JIT compilation using Numba for critical computations
   - Concurrent batch processing of wallet generations
   - Asynchronous logging system with rotation
   - Collection-based data structures for faster operations
+  - NumPy-based address matching for improved speed
+  - Dynamic performance tuning during runtime
 
 - **Robust Error Handling**
   - Graceful shutdown mechanisms
   - Comprehensive exception management
   - Automatic recovery systems
+  - Safe interrupt handling with cleanup
+  - Progress preservation on shutdown
+
+- **Logging and Monitoring**
+  - Optional wallet logging system
+  - Real-time performance metrics
+  - Progress tracking with detailed statistics
+  - Rotated log files with compression
+  - Configurable logging levels and formats
 
 ## 🛠 Technical Requirements
 
@@ -34,15 +49,16 @@ A highly efficient Bitcoin wallet generator and matcher that leverages parallel 
 ### Dependencies
 
 ```bash
-# Core dependencies
-python-bitcoinlib>=0.11.0
-psutil>=5.8.0
-numba>=0.54.0
-concurrent-log-handler>=0.9.19
-
-# Optional performance enhancers
-pypy>=7.3.0  # For critical sections
-cython>=0.29.0  # For additional optimizations
+bitarray>=2.8.3
+bitcoin>=1.1.42
+coincurve>=18.0.0
+ecdsa>=0.18.0
+base58>=2.1.1
+tqdm>=4.66.1
+concurrent-log-handler>=0.9.24
+psutil>=5.9.8
+numpy>=1.26.4
+numba>=0.60.0
 ```
 
 ## 🔧 Installation
@@ -53,15 +69,7 @@ git clone https://github.com/yourusername/bitcoin-wallet-hunter.git
 cd bitcoin-wallet-hunter
 ```
 
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-.\venv\Scripts\activate  # Windows
-```
-
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -71,93 +79,50 @@ pip install -r requirements.txt
 ### Basic Usage
 
 ```bash
-python main.py --threads 4 --target 1000000
+python main.py
 ```
 
-### Advanced Configuration
+The program will prompt you for:
+1. Number of threads to use (suggests optimal value)
+2. Number of wallets to generate
+3. Whether to log generated wallets (optional)
 
-```python
-# config.py
-MAX_BATCH_SIZE = 10000
-BUFFER_SIZE = 8192  # 8KB
-LOG_ROTATION_SIZE = 10485760  # 10MB
-```
+### Runtime Information
 
-## 🏗 Architecture
+The program displays real-time information:
+- Current progress and speed
+- Batch size adjustments
+- Memory usage statistics
+- Found matches (if any)
 
-### Core Components
+### Output Files
 
-```plaintext
-├── main.py                 # Entry point
-├── address_matcher.py      # Matching logic with optimizations
-├── wallet_generator.py     # Wallet generation engine
-├── config.py              # Configuration management
-└── file_handler.py        # I/O operations handler
-```
+- `found.txt`: Contains matched wallet addresses and private keys
+- `wallets.log`: Optional log of all generated wallets
+- `btcfinder.log`: Program execution logs and errors
 
-### Performance Metrics
+## ⚡ Performance Tips
 
-| Operation          | Speed (ops/sec) | Memory Usage |
-|-------------------|-----------------|--------------|
-| Wallet Generation | ~50,000         | ~100MB      |
-| Address Matching  | ~100,000        | ~50MB       |
-| File I/O         | ~10,000         | Varies      |
+1. **Optimal Thread Count**
+   - Use suggested thread count (CPU cores - 1)
+   - Leave one core for system operations
 
-## 🔍 Monitoring
+2. **Wallet Logging**
+   - Enable only when necessary
+   - Affects disk I/O and overall performance
+   - Uses buffered writing for efficiency
 
-### Logging System
+3. **Batch Size**
+   - Automatically optimizes based on system performance
+   - Adjusts dynamically during runtime
+   - Can be monitored in real-time
 
-- Rotated log files with UTC timestamps
-- Structured logging format
-- Performance metrics tracking
-- Error tracing and debugging information
+## 🛡 Security Notes
 
-### Resource Usage
-
-The application automatically monitors and adjusts based on:
-- CPU utilization
-- Memory consumption
-- Disk I/O operations
-- Network bandwidth (if applicable)
-
-## 🛡 Security Considerations
-
-- Private key handling with secure memory wiping
-- Cryptographic operations using standard libraries
-- No external API dependencies for core operations
-- Secure random number generation
-
-## ⚡ Optimization Tips
-
-1. **Process Pool Configuration**
-```python
-process_count = min(cpu_count() - 1, 4)  # Reserve one core for system
-```
-
-2. **Memory-Mapped Files**
-```python
-with open(filename, 'rb') as f:
-    mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-```
-
-3. **JIT Compilation**
-```python
-@numba.jit(nopython=True)
-def performance_critical_function():
-    # Your code here
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Implement your changes
-4. Add tests for your implementation
-5. Submit a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- Private keys are handled securely
+- Optional logging with user confirmation
+- Safe shutdown mechanisms
+- No external API dependencies
 
 ## ⚠️ Disclaimer
 
